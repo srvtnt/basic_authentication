@@ -9,7 +9,7 @@ import {
   IsInt,
 } from 'class-validator';
 
-export class CreateUserDto {
+export class RegisterAuthInput {
   @IsNotEmpty()
   @IsString()
   username: string;
@@ -31,6 +31,12 @@ export class CreateUserDto {
   @MinLength(6)
   @MaxLength(16)
   password: string;
+
+  @IsNotEmpty()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(16)
+  repassword: string;
 
   @IsNotEmpty()
   @IsBoolean()

@@ -11,3 +11,7 @@ export const jwtRefreshConstants = {
 export const jwtTokenConstants = {
   secret: envs.jwtSecret,
 };
+
+export const jwtTokenValidate = {
+  secret: envs.jwtValidation,
+};

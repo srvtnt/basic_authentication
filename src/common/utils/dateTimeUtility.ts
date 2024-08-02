@@ -7,6 +7,12 @@ export const getExpiry = (cant: number) => {
   return expiresAt;
 };
 
+export const getExpiryCode = (cant: number) => {
+  const createdAt = new Date();
+  const expiresAt = moment(createdAt).add(cant, 'seconds').toDate();
+  return expiresAt;
+};
+
 export function isDateExpired(expiry: Date): boolean {
   const expirationDate = new Date(expiry);
   const currentDate = new Date();

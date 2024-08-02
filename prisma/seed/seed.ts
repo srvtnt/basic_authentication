@@ -1,15 +1,22 @@
 import { PrismaClient } from '@prisma/client';
-// import { encrypt } from "../../src/utils/bcrypt.handle";
+import * as moment from 'moment';
+import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
+
+const getExpiry = (cant: number) => {
+  const createdAt = new Date();
+  const expiresAt = moment(createdAt).add(cant, 'days').toDate();
+  return expiresAt;
+};
+
 async function main() {
+  const expire_pass = getExpiry(365);
   const password = 'admin123';
-  // const hashPassword = encrypt(password);
+  const hashPassword = await bcrypt.hash(password, 10);
   const roles = await prisma.roles.createMany({
     data: [
-      { name: 'administrador', description: 'rol administrador' },
-      { name: 'autoridad', description: 'rol para las autoridades' },
-      { name: 'director', description: 'rol para los directores' },
-      { name: 'usuario', description: 'rol por defecto' },
+      { name: 'admin', description: 'role with all privileges' },
+      { name: 'user', description: 'default role' },
     ],
   });
 
@@ -19,19 +26,35 @@ async function main() {
       fullname: 'Administrador',
       email: 'admin@example.com',
       phone: '0212000000',
-      // password: hashPassword,
-      // lastpass: [hashPassword],
-      expirepass: new Date(),
+      password: hashPassword,
+      lastpass: [hashPassword],
+      expirepass: expire_pass,
       force_new_pass: false,
-      rol: {
+      roles: {
         create: {
           rol_id: 1,
+        },
+      },
+      profile: {
+        create: {
+          firstname: 'Administrador',
+          last_name: 'Sistema',
         },
       },
     },
   });
 
-  console.log({ roles, user });
+  const config = await prisma.config_auth.create({
+    data: {
+      https: false,
+      useEmail: false,
+      max_last_pass: 3,
+      time_life_pass: 90,
+      twoFA: false,
+      time_life_code: 900,
+    },
+  });
+  console.log({ roles, user, config });
 }
 main()
   .then(async () => {

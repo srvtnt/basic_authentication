@@ -7,6 +7,7 @@ interface EnvVars {
   ISSUER: string;
   JWTSECRET: string;
   JWTREFRESH: string;
+  JWTVALIDATION: string;
 }
 
 const envsSchema = joi
@@ -16,6 +17,7 @@ const envsSchema = joi
     ISSUER: joi.string().required(),
     JWTSECRET: joi.string().required(),
     JWTREFRESH: joi.string().required(),
+    JWTVALIDATION: joi.string().required(),
   })
   .unknown(true);
 
@@ -31,6 +33,7 @@ export const envs = {
   port: envVars.PORT,
   dataBaseUrl: envVars.DATABASE_URL,
   issuer: envVars.ISSUER,
-  jwtSecret: envVars.JWTREFRESH,
+  jwtSecret: envVars.JWTSECRET,
   jwtRefresh: envVars.JWTREFRESH,
+  jwtValidation: envVars.JWTVALIDATION,
 };
