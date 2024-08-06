@@ -8,6 +8,8 @@ interface EnvVars {
   JWTSECRET: string;
   JWTREFRESH: string;
   JWTVALIDATION: string;
+  APIKEYRESEND?: string;
+  SUPPORTEMAIL?: string;
 }
 
 const envsSchema = joi
@@ -18,6 +20,8 @@ const envsSchema = joi
     JWTSECRET: joi.string().required(),
     JWTREFRESH: joi.string().required(),
     JWTVALIDATION: joi.string().required(),
+    APIKEYRESEND: joi.string(),
+    SUPPORTEMAIL: joi.string(),
   })
   .unknown(true);
 
@@ -36,4 +40,6 @@ export const envs = {
   jwtSecret: envVars.JWTSECRET,
   jwtRefresh: envVars.JWTREFRESH,
   jwtValidation: envVars.JWTVALIDATION,
+  apyKeyResend: envVars.APIKEYRESEND,
+  supportEmail: envVars.SUPPORTEMAIL,
 };

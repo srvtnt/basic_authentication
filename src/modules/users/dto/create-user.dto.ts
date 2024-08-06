@@ -35,7 +35,7 @@ export class CreateUserDto {
   @IsNotEmpty()
   @IsBoolean()
   @IsOptional()
-  force_new_pass: boolean;
+  force_new_pass?: boolean;
 
   @IsNotEmpty()
   @IsInt()

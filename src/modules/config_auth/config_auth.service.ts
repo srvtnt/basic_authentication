@@ -23,7 +23,7 @@ export class ConfigAuthService {
     }
   }
 
-  async findConfigById(id: number) {
+  async findConfigById(id: number): Promise<OutputConfigAuth> {
     try {
       const res = await this.prisma.config_auth.findFirst({
         where: {
@@ -35,7 +35,10 @@ export class ConfigAuthService {
       return error;
     }
   }
-  async update(id: number, updateConfigAuthDto: UpdateConfigAuthDto) {
+  async update(
+    id: number,
+    updateConfigAuthDto: UpdateConfigAuthDto,
+  ): Promise<OutputConfigAuth> {
     const { ...data } = updateConfigAuthDto;
     const findConfig = await this.findConfigById(id);
 

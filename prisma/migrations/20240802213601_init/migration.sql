@@ -13,14 +13,14 @@ CREATE TABLE "users" (
     "phone" TEXT,
     "password" TEXT NOT NULL,
     "metadata" JSONB,
-    "lastpass" JSONB,
+    "lastpass" TEXT[],
     "expirepass" TIMESTAMP(3),
     "force_new_pass" BOOLEAN DEFAULT false,
     "twoFA" BOOLEAN DEFAULT false,
     "isEmailVerified" BOOLEAN DEFAULT false,
     "status" TEXT NOT NULL DEFAULT 'ACTIVE',
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -50,8 +50,8 @@ CREATE TABLE "roles" (
     "id" SERIAL NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "roles_pkey" PRIMARY KEY ("id")
 );
@@ -61,8 +61,8 @@ CREATE TABLE "users_roles" (
     "id" SERIAL NOT NULL,
     "user_id" UUID NOT NULL,
     "rol_id" INTEGER NOT NULL,
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "users_roles_pkey" PRIMARY KEY ("id")
 );
@@ -76,6 +76,7 @@ CREATE TABLE "verification_tokens" (
     "userId" UUID NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "expireAt" TIMESTAMP(3) NOT NULL,
+    "ip" TEXT,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "verification_tokens_pkey" PRIMARY KEY ("id")
@@ -98,12 +99,13 @@ CREATE TABLE "config_auth" (
 
 -- CreateTable
 CREATE TABLE "sessions_auth" (
-    "id" SERIAL NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "userId" UUID NOT NULL,
     "jwt" TEXT NOT NULL,
     "expireAt" INTEGER NOT NULL,
     "last_activity" TIMESTAMP(3),
     "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "ip" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "sessions_auth_pkey" PRIMARY KEY ("id")

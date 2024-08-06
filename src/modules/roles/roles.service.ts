@@ -1,21 +1,15 @@
-import {
-  ForbiddenException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { CreateRole } from './dto/create-role.';
 import { UpdateRole } from './dto/update-role.dto';
-import { ResponseRolDto } from './dto/response-rol';
-import { ErrorManager } from '../../common/utils/error.manager';
 import { Roles } from './entities/role.entity';
 import { PrismaService } from 'src/common/prisma/prisma.service';
+import { OutputRoles } from './types';
 
 @Injectable()
 export class RolesService {
   constructor(private prismaService: PrismaService) {}
 
-  async findRolName(name: string) {
+  async findRolName(name: string): Promise<Roles> {
     return await this.prismaService.roles.findFirst({
       where: {
         name: name,
@@ -23,7 +17,7 @@ export class RolesService {
     });
   }
 
-  async findRolId(id: number) {
+  async findRolId(id: number): Promise<Roles> {
     return await this.prismaService.roles.findFirst({
       where: {
         id: id,
@@ -31,7 +25,7 @@ export class RolesService {
     });
   }
 
-  async create(createRole: CreateRole) {
+  async create(createRole: CreateRole): Promise<OutputRoles> {
     const { name, description } = createRole;
     const find = await this.findRolName(name);
     if (find != null)
@@ -49,7 +43,7 @@ export class RolesService {
     };
   }
 
-  async findAll() {
+  async findAll(): Promise<OutputRoles[]> {
     const res = await this.prismaService.roles.findMany();
     const data = res.map((item) => {
       return {
@@ -61,7 +55,7 @@ export class RolesService {
     return data;
   }
 
-  async findOne(id: number): Promise<ResponseRolDto> {
+  async findOne(id: number): Promise<OutputRoles> {
     const res = await this.findRolId(id);
     if (res === null)
       throw new HttpException('rol does not exist', HttpStatus.BAD_REQUEST);
@@ -72,7 +66,7 @@ export class RolesService {
     };
   }
 
-  async update(id: number, updateRole: UpdateRole): Promise<ResponseRolDto> {
+  async update(id: number, updateRole: UpdateRole): Promise<OutputRoles> {
     const { name, description } = updateRole;
     const find = await this.findRolId(id);
 
@@ -97,7 +91,7 @@ export class RolesService {
     };
   }
 
-  async remove(id: number) {
+  async remove(id: number): Promise<OutputRoles> {
     const find = await this.findRolId(id);
     if (find === null)
       throw new HttpException(

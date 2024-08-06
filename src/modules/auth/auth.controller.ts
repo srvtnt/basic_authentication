@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   HttpCode,
+  Ip,
+  Param,
   Post,
   Query,
   Req,
@@ -16,7 +18,10 @@ import { LoginAuthResponse } from './types/login';
 import { RefreshTokenInput } from './dto/refreshToken.dto';
 import { LogoutDtoInput } from './dto/logout.dto';
 import { JwtAuthGuard } from './guards/jwt-auth-guard';
-import { ValidateCodeInput } from './dto/validateCode.dto';
+import {
+  EmailPasswordDto,
+  RecoveryPasswordDto,
+} from './dto/recoveryPassword.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -25,8 +30,11 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
-  login(@Body() loginAuthInput: LoginAuthInput): Promise<LoginAuthResponse> {
-    return this.authService.login(loginAuthInput);
+  login(
+    @Ip() ip: string,
+    @Body() loginAuthInput: LoginAuthInput,
+  ): Promise<LoginAuthResponse> {
+    return this.authService.login(loginAuthInput, ip);
   }
 
   @Public()
@@ -39,9 +47,13 @@ export class AuthController {
   @Public()
   @Post('refresh_token')
   @HttpCode(200)
-  async refreshToken(@Body() refreshTokenInput: RefreshTokenInput) {
+  async refreshToken(
+    @Ip() ip: string,
+    @Body() refreshTokenInput: RefreshTokenInput,
+  ) {
     return await this.authService.validateSession(
       refreshTokenInput.refreshToken,
+      ip,
     );
   }
 
@@ -54,9 +66,37 @@ export class AuthController {
   }
 
   @Public()
-  @Get('validate_code')
+  @Get('validate_code_login')
   @HttpCode(200)
-  validate_code(@Query('token') token: string, @Query('code') code: string) {
-    return this.authService.validateCode(parseInt(code), token);
+  validate_code_login(
+    @Ip() ip: string,
+    @Query('token') token: string,
+    @Query('code') code: string,
+  ) {
+    return this.authService.validateCodeLogin(parseInt(code), token, ip);
+  }
+
+  @Public()
+  @Get('validate_code_password')
+  @HttpCode(200)
+  validate_code_password(
+    @Query('token') token: string,
+    @Query('code') code: string,
+  ) {
+    return this.authService.validateCodePassword(parseInt(code), token);
+  }
+
+  @Public()
+  @Post('email_password')
+  @HttpCode(200)
+  email_password(@Ip() ip: string, @Body() emailPasswordDto: EmailPasswordDto) {
+    return this.authService.codeRecoveryPassword(ip, emailPasswordDto);
+  }
+
+  @Public()
+  @Post('recovery_password')
+  @HttpCode(200)
+  recovery_password(@Body() recoveryPasswordDto: RecoveryPasswordDto) {
+    return this.authService.recovery_password(recoveryPasswordDto);
   }
 }
