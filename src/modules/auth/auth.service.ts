@@ -7,20 +7,19 @@ import {
   DecodeJwt,
   JwtPayload,
   ValidationInput,
-  Verification_Tokens,
+  VerificationToken,
 } from './types';
 import { UsersService } from '../users/users.service';
 import { ConfigAuthService } from '../config_auth/config_auth.service';
 import { compare } from 'bcrypt';
 import { RegisterAuthInput } from './dto/register.dto';
-import { LoginAuthResponse, LoginSessionInput } from './types/login';
+import { LoginAuthResponse, SessionInput } from './types/login';
 import {
   getExpiry,
   getExpiryCode,
   isDateExpired,
 } from 'src/common/utils/dateTimeUtility';
 import { generateOTP } from 'src/common/utils/otpCode';
-import { UseCase } from '@prisma/client';
 import {
   EmailPasswordDto,
   RecoveryPasswordDto,
@@ -128,12 +127,12 @@ export class AuthService {
 
   async createValidation(
     validationInput: ValidationInput,
-  ): Promise<{ tokenValidate: string; code: number; url: string }> {
-    const { userId, useCase, ip } = validationInput;
-    const findVerification = await this.findVerificationToken(userId, useCase);
+  ): Promise<{ tokenValidate: string; code: number }> {
+    const { userId, ip } = validationInput;
+    const findVerification = await this.findVerificationToken(userId);
 
     if (findVerification) {
-      await this.deleteTokenVerification(findVerification.jwt);
+      await this.deleteTokenVerification(findVerification.sessionToken);
     }
 
     const findUser = await this.userService.findUserById(userId);
@@ -156,13 +155,12 @@ export class AuthService {
     const codeOtp = generateOTP();
 
     const expires = getExpiryCode(findConfigAuth.time_life_code);
-    const res = await this.prisma.verification_tokens.create({
+    const res = await this.prisma.verificationToken.create({
       data: {
-        useCase: useCase,
-        jwt: generateToken,
+        sessionToken: generateToken,
         code: codeOtp,
-        userId: userId,
-        expireAt: expires,
+        identifier: userId,
+        expires: expires,
         ip: ipClient,
       },
     });
@@ -175,27 +173,26 @@ export class AuthService {
     return {
       tokenValidate: generateToken,
       code: codeOtp,
-      url: envs.issuer + `/validate_code?token=${generateToken}`,
     };
   }
 
-  async createSession(loginSessionInput: LoginSessionInput): Promise<string> {
-    const { jwt, userId, expireAt, is_active, ip } = loginSessionInput;
+  async createSession(sessionInput: SessionInput): Promise<string> {
+    const { sessionToken, userId, expires, is_active, ip } = sessionInput;
 
     // Check how many active sessions the user has
-    const activeSessions = await this.prisma.sessions_auth.count({
+    const activeSessions = await this.prisma.session.count({
       where: { userId: userId, is_active: true },
     });
 
     // If the user already has the maximum number of sessions, delete the oldest one
     if (activeSessions >= this.MAX_SESSIONS) {
-      const oldestSession = await this.prisma.sessions_auth.findFirst({
+      const oldestSession = await this.prisma.session.findFirst({
         where: { userId: userId, is_active: true },
         orderBy: { createdAt: 'asc' }, // Assuming you have a createdAt field
       });
 
       if (oldestSession) {
-        await this.prisma.sessions_auth.update({
+        await this.prisma.session.update({
           where: { id: oldestSession.id }, // delete the session if you prefer
           data: {
             is_active: false,
@@ -205,11 +202,11 @@ export class AuthService {
     }
 
     // Create the new session
-    const res = await this.prisma.sessions_auth.create({
+    const res = await this.prisma.session.create({
       data: {
         userId: userId,
-        jwt: jwt,
-        expireAt: expireAt,
+        sessionToken: sessionToken,
+        expires: expires,
         is_active: is_active,
         ip: ip,
       },
@@ -219,24 +216,18 @@ export class AuthService {
     return 'successful create session';
   }
 
-  async findVerificationToken(
-    userdId: string,
-    useCase: UseCase,
-  ): Promise<Verification_Tokens> {
-    return await this.prisma.verification_tokens.findFirst({
+  async findVerificationToken(userdId: string): Promise<VerificationToken> {
+    return await this.prisma.verificationToken.findFirst({
       where: {
-        userId: userdId,
-        AND: {
-          useCase: useCase,
-        },
+        identifier: userdId,
       },
     });
   }
 
-  async deleteTokenVerification(jwt: string) {
-    return await this.prisma.verification_tokens.delete({
+  async deleteTokenVerification(sessionToken: string) {
+    return await this.prisma.verificationToken.delete({
       where: {
-        jwt,
+        sessionToken,
       },
     });
   }
@@ -246,8 +237,8 @@ export class AuthService {
     if (!verifiedToken)
       throw new HttpException('Invalid refresh token', HttpStatus.NOT_FOUND);
 
-    const res = await this.prisma.sessions_auth.update({
-      where: { userId: userId, is_active: true, jwt: token },
+    const res = await this.prisma.session.update({
+      where: { userId: userId, is_active: true, sessionToken: token },
       data: {
         is_active: false,
       },
@@ -286,14 +277,10 @@ export class AuthService {
 
     const ipClient = this.decodeClientIp(ip);
 
-    if (
-      (findUser.twoFA && findUser.isEmailVerified === false) ||
-      (findUser.twoFA && findUser.isEmailVerified)
-    ) {
+    if (findUser.twoFA) {
       // Check if double verification is active and if the email is already validated
       //Generates a token and creates a record to validate which is sent by email to be able to enter and obtain a valid token
       const res = await this.createValidation({
-        useCase: 'E2FA',
         userId: findUser.id,
         ip: ipClient,
       });
@@ -319,10 +306,9 @@ export class AuthService {
       );
 
       return {
-        twoFA: true,
+        twoFa: true,
         tokenValidation: res.tokenValidate,
         msg: 'You must validate your income by email',
-        url: res.url,
       };
 
       //falta el envio por correo del codigo y quitar de la respuesta el codigo
@@ -330,7 +316,7 @@ export class AuthService {
 
     //valid date expires password
     const expiredPass = isDateExpired(findUser.expirepass);
-    if (expiredPass || findUser.force_new_pass) {
+    if (expiredPass) {
       msg = 'Password needs to be updated';
     } else {
       msg = 'successful entry';
@@ -343,18 +329,18 @@ export class AuthService {
     const decodeRefresh = this.decodeToken(refreshToken);
 
     await this.createSession({
-      jwt: refreshToken,
+      sessionToken: refreshToken,
       userId: findUser.id,
-      expireAt: decodeRefresh.exp,
+      expires: decodeRefresh.exp,
       is_active: true,
       ip: ipClient,
     });
 
     return {
-      access_token: access_token,
-      expire_access_token: decodeToken.exp,
+      accessToken: access_token,
+      accessTokenExpiration: decodeToken.exp,
       refreshToken: refreshToken,
-      expire_refresh_token: decodeRefresh.exp,
+      refreshTokenExpiration: decodeRefresh.exp,
       msg: msg,
       user: {
         id: findUser.id,
@@ -380,12 +366,12 @@ export class AuthService {
     if (!validRefreshToken)
       throw new HttpException('Invalid refresh token', HttpStatus.UNAUTHORIZED);
 
-    const decodeRefreshToken = await this.decodeToken(token);
+    const decodeRefreshToken = this.decodeToken(token);
     // Verificar si la sesión está activa
-    const session = await this.prisma.sessions_auth.findFirst({
+    const session = await this.prisma.session.findFirst({
       where: {
         userId: decodeRefreshToken.id,
-        jwt: token,
+        sessionToken: token,
         is_active: true,
       },
     });
@@ -399,7 +385,7 @@ export class AuthService {
 
     // Verificar si la sesión ha expirado
     const currentTime = Math.floor(Date.now() / 1000); // Tiempo actual en segundos
-    if (session.expireAt < currentTime) {
+    if (session.expires < currentTime) {
       throw new HttpException('Session has expired', HttpStatus.UNAUTHORIZED);
     }
 
@@ -416,10 +402,10 @@ export class AuthService {
 
     //generates the access token , extract token expiration time
     const access_token = await this.generateAccesToken(payload);
-    const decodeToken = await this.decodeToken(access_token);
-    await this.prisma.sessions_auth.update({
+    const decodeToken = this.decodeToken(access_token);
+    await this.prisma.session.update({
       where: {
-        jwt: token,
+        sessionToken: token,
       },
       data: {
         last_activity: new Date(),
@@ -428,8 +414,8 @@ export class AuthService {
     });
 
     return {
-      access_token: access_token,
-      expire_access_token: decodeToken.exp,
+      accessToken: access_token,
+      accessTokenExpiration: decodeToken.exp,
       msg: 'successful entry',
     };
   }
@@ -445,24 +431,24 @@ export class AuthService {
         HttpStatus.UNAUTHORIZED,
       );
 
-    const res = await this.prisma.verification_tokens.findFirst({
+    const res = await this.prisma.verificationToken.findFirst({
       where: {
         code: code,
-        jwt: token,
+        sessionToken: token,
       },
     });
     if (res === null)
       throw new HttpException('invalid code', HttpStatus.UNAUTHORIZED);
 
-    const expiresCode = isDateExpired(res.expireAt);
+    const expiresCode = isDateExpired(res.expires);
 
     if (expiresCode)
       throw new HttpException('code expired', HttpStatus.UNAUTHORIZED);
 
     if (validToken && res !== null && !expiresCode) {
-      await this.prisma.verification_tokens.delete({
+      await this.prisma.verificationToken.delete({
         where: {
-          jwt: token,
+          sessionToken: token,
           code: code,
         },
       });
@@ -501,9 +487,9 @@ export class AuthService {
     const decodeRefresh = this.decodeToken(refreshToken);
 
     await this.createSession({
-      jwt: refreshToken,
+      sessionToken: refreshToken,
       userId: decodeValidateToken.id,
-      expireAt: decodeRefresh.exp,
+      expires: decodeRefresh.exp,
       is_active: true,
       ip: ipClient,
     });
@@ -511,23 +497,23 @@ export class AuthService {
     const findUser = await this.userService.findUserById(
       decodeValidateToken.id,
     );
-    if (findUser.isEmailVerified === false) {
-      await this.prisma.users.update({
+    if (findUser.emailVerified === null) {
+      await this.prisma.user.update({
         where: {
           id: decodeValidateToken.id,
         },
         data: {
-          isEmailVerified: true,
+          emailVerified: new Date(),
           twoFA: true,
         },
       });
     }
 
     return {
-      access_token: access_token,
-      expire_access_token: decodeToken.exp,
+      accessToken: access_token,
+      accessTokenExpiration: decodeToken.exp,
       refreshToken: refreshToken,
-      expire_refresh_token: decodeRefresh.exp,
+      refreshTokenExpiration: decodeRefresh.exp,
       msg: 'successful entry',
       user: {
         id: findUser.id,
@@ -542,12 +528,12 @@ export class AuthService {
 
   async codeRecoveryPassword(ip: string, emailPasswordDto: EmailPasswordDto) {
     const { email } = emailPasswordDto;
-    const findUser = await this.prisma.users.findFirst({
+    const findUser = await this.prisma.user.findFirst({
       where: {
         email: email,
       },
       include: {
-        roles: {
+        role: {
           include: {
             rol: {
               select: {
@@ -565,7 +551,6 @@ export class AuthService {
       );
 
     const res = await this.createValidation({
-      useCase: 'VEM',
       userId: findUser.id,
       ip: ip,
     });
@@ -592,10 +577,9 @@ export class AuthService {
     );
 
     return {
-      twoFA: true,
+      twoFa: true,
       tokenValidation: res.tokenValidate,
       msg: 'You must validate your income by email',
-      url: res.url,
     };
   }
 

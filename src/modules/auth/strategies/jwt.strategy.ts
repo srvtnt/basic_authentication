@@ -16,10 +16,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     // Verifica si el usuario existe en la base de datos
-    const user = await this.prisma.users.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: payload.id },
       include: {
-        roles: {
+        role: {
           select: {
             id: true,
           },
@@ -36,7 +36,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     return {
       userId: user.id,
       email: user.email,
-      role: user.roles[0].id,
+      role: user.role[0].id,
       expire_in: payload.exp,
     };
   }

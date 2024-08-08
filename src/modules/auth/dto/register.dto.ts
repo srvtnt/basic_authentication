@@ -38,10 +38,9 @@ export class RegisterAuthInput {
   @MaxLength(16)
   repassword: string;
 
-  @IsNotEmpty()
-  @IsBoolean()
+  @IsString()
   @IsOptional()
-  force_new_pass: boolean;
+  image: string;
 
   @IsNotEmpty()
   @IsInt()

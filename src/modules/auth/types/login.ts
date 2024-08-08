@@ -1,21 +1,20 @@
 export interface LoginAuthResponse {
   code?: number;
-  twoFA?: boolean;
-  access_token?: string;
+  twoFa?: boolean;
+  accessToken?: string;
   expire_pass?: boolean;
   refreshToken?: string;
-  expire_access_token?: number;
+  accessTokenExpiration?: number;
   msg?: string;
-  expire_refresh_token?: number;
+  refreshTokenExpiration?: number;
   tokenValidation?: string;
-  url?: string;
   user?: UserLogin;
 }
 
-export interface LoginSessionInput {
+export interface SessionInput {
   userId: string;
-  jwt: string;
-  expireAt: number;
+  sessionToken: string;
+  expires: number;
   last_activity?: Date;
   is_active?: boolean;
   ip: string;

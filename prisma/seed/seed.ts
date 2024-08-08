@@ -13,14 +13,14 @@ async function main() {
   const expire_pass = getExpiry(365);
   const password = 'admin123';
   const hashPassword = await bcrypt.hash(password, 10);
-  const roles = await prisma.roles.createMany({
+  const roles = await prisma.role.createMany({
     data: [
       { name: 'admin', description: 'role with all privileges' },
       { name: 'user', description: 'default role' },
     ],
   });
 
-  const user = await prisma.users.create({
+  const user = await prisma.user.create({
     data: {
       username: 'admin',
       fullname: 'Administrador',
@@ -29,8 +29,9 @@ async function main() {
       password: hashPassword,
       lastpass: [hashPassword],
       expirepass: expire_pass,
-      force_new_pass: false,
-      roles: {
+      emailVerified: new Date(),
+      status: 'ACTIVE',
+      role: {
         create: {
           rol_id: 1,
         },
@@ -44,7 +45,7 @@ async function main() {
     },
   });
 
-  const config = await prisma.config_auth.create({
+  const config = await prisma.configAuth.create({
     data: {
       https: false,
       useEmail: false,

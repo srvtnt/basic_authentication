@@ -1,11 +1,4 @@
-import {
-  IsEmail,
-  IsInt,
-  IsJSON,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsInt, IsJSON, IsOptional, IsString } from 'class-validator';
 import { Prisma } from '@prisma/client';
 
 export class UpdateUserProfileDto {

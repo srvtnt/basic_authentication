@@ -1,36 +1,36 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { CreateRole } from './dto/create-role.';
 import { UpdateRole } from './dto/update-role.dto';
-import { Roles } from './entities/role.entity';
+import { Role } from './entities/role.entity';
 import { PrismaService } from 'src/common/prisma/prisma.service';
-import { OutputRoles } from './types';
+import { OutputRole } from './types';
 
 @Injectable()
 export class RolesService {
   constructor(private prismaService: PrismaService) {}
 
-  async findRolName(name: string): Promise<Roles> {
-    return await this.prismaService.roles.findFirst({
+  async findRolName(name: string): Promise<Role> {
+    return await this.prismaService.role.findFirst({
       where: {
         name: name,
       },
     });
   }
 
-  async findRolId(id: number): Promise<Roles> {
-    return await this.prismaService.roles.findFirst({
+  async findRolId(id: number): Promise<Role> {
+    return await this.prismaService.role.findFirst({
       where: {
         id: id,
       },
     });
   }
 
-  async create(createRole: CreateRole): Promise<OutputRoles> {
+  async create(createRole: CreateRole): Promise<OutputRole> {
     const { name, description } = createRole;
     const find = await this.findRolName(name);
     if (find != null)
       throw new HttpException('rol already exists', HttpStatus.BAD_REQUEST);
-    const res: any = await this.prismaService.roles.create({
+    const res: any = await this.prismaService.role.create({
       data: {
         name: name.toLocaleUpperCase(),
         description: description.toLocaleUpperCase(),
@@ -43,8 +43,8 @@ export class RolesService {
     };
   }
 
-  async findAll(): Promise<OutputRoles[]> {
-    const res = await this.prismaService.roles.findMany();
+  async findAll(): Promise<OutputRole[]> {
+    const res = await this.prismaService.role.findMany();
     const data = res.map((item) => {
       return {
         id: item.id,
@@ -55,7 +55,7 @@ export class RolesService {
     return data;
   }
 
-  async findOne(id: number): Promise<OutputRoles> {
+  async findOne(id: number): Promise<OutputRole> {
     const res = await this.findRolId(id);
     if (res === null)
       throw new HttpException('rol does not exist', HttpStatus.BAD_REQUEST);
@@ -66,7 +66,7 @@ export class RolesService {
     };
   }
 
-  async update(id: number, updateRole: UpdateRole): Promise<OutputRoles> {
+  async update(id: number, updateRole: UpdateRole): Promise<OutputRole> {
     const { name, description } = updateRole;
     const find = await this.findRolId(id);
 
@@ -75,7 +75,7 @@ export class RolesService {
         'cannot update category does not exist',
         HttpStatus.BAD_REQUEST,
       );
-    const res: any = await this.prismaService.roles.update({
+    const res: any = await this.prismaService.role.update({
       where: {
         id: id,
       },
@@ -91,14 +91,14 @@ export class RolesService {
     };
   }
 
-  async remove(id: number): Promise<OutputRoles> {
+  async remove(id: number): Promise<OutputRole> {
     const find = await this.findRolId(id);
     if (find === null)
       throw new HttpException(
         'cannot delete rol does not exist',
         HttpStatus.BAD_REQUEST,
       );
-    const res: any = await this.prismaService.roles.delete({
+    const res: any = await this.prismaService.role.delete({
       where: {
         id: id,
       },

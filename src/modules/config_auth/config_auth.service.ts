@@ -9,7 +9,7 @@ export class ConfigAuthService {
 
   async findAll(): Promise<OutputConfigAuth> {
     try {
-      const res = await this.prisma.config_auth.findMany();
+      const res = await this.prisma.configAuth.findMany();
       return {
         id: res[0].id,
         https: res[0].https,
@@ -25,7 +25,7 @@ export class ConfigAuthService {
 
   async findConfigById(id: number): Promise<OutputConfigAuth> {
     try {
-      const res = await this.prisma.config_auth.findFirst({
+      const res = await this.prisma.configAuth.findFirst({
         where: {
           id: id,
         },
@@ -44,7 +44,7 @@ export class ConfigAuthService {
 
     if (!findConfig)
       throw new HttpException('Error config not exist', HttpStatus.BAD_REQUEST);
-    const res = await this.prisma.config_auth.update({
+    const res = await this.prisma.configAuth.update({
       where: {
         id: id,
       },

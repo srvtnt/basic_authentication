@@ -10,31 +10,32 @@ datasource db {
   extensions = [pgcrypto]
 }
 
-model users {
-  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  username       String        @unique
-  fullname       String?
-  email          String        @unique
-  phone          String?
-  password       String
-  metadata       Json?
-  lastpass       String[]
-  expirepass     DateTime?
-  force_new_pass  Boolean?       @default(false)
-  twoFA           Boolean?      @default(false)
-  isEmailVerified Boolean?      @default(false)
-  status         String        @default("ACTIVE")
-  createdAt      DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime      @default(now()) @db.Timestamptz(6)
-  roles          users_roles[]
-  profile        profile?
-  verification_token verification_tokens[]
-  session_token  sessions_auth[]
+model User  {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username            String        @unique
+  fullname            String?
+  email               String        @unique
+  phone               String?
+  password            String
+  lastpass            String[]
+  expirepass          DateTime?
+  twoFA               Boolean?      @default(false)
+  emailVerified       DateTime?     
+  image               String?
+  status              String        @default("ACTIVE")
+  role                UserRole[]
+  profile             Profile?
+  verification_token  VerificationToken[]
+  session_token       Session[]
+  accounts            Account[]
+
+  createdAt           DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime      @updatedAt()
 
   @@index([username, email], map: "User_Index_00")
 }
 
-model profile {
+model Profile {
   id             Int       @id @default(autoincrement())
   userId         String    @unique @db.Uuid
   firstname      String
@@ -49,58 +50,68 @@ model profile {
   picture        String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
-  user           users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId], map: "Profile_Index_00")
 }
 
-model roles {
+model Account {
+  userId            String   @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+ 
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@id([provider, providerAccountId])
+}
+
+model Role {
   id          Int           @id @default(autoincrement())
   name        String        @unique
   description String?
-  createdAt  DateTime      @default(now()) @db.Timestamptz(6)
-  updatedAt  DateTime      @default(now()) @db.Timestamptz(6)
-  user        users_roles[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user        UserRole[]
 
   @@index([name], map: "Roles_Index_00")
 }
 
-model users_roles {
+model UserRole {
   id         Int      @id @default(autoincrement())
   user_id    String   @db.Uuid
   rol_id     Int
-  createdAt DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt DateTime @default(now()) @db.Timestamptz(6)
-  rol        roles    @relation(fields: [rol_id], references: [id])
-  user       users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  rol        Role     @relation(fields: [rol_id], references: [id])
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id, rol_id], map: "User_Roles_Index_00")
 }
 
 
-model verification_tokens {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  useCase   UseCase
-  jwt       String   @unique
-  code      Int?
-  userId    String   @db.Uuid
-  createdAt DateTime @default(now())
-  expireAt  DateTime
-  ip        String?  
-  updatedAt DateTime @updatedAt
-  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+model VerificationToken  {
+  sessionToken  String   @unique
+  code          Int?
+  identifier    String   @db.Uuid
+  expires       DateTime
+  ip            String?  
+  user          User     @relation(fields: [identifier], references: [id], onDelete: Cascade)
 
-  @@index([jwt], map: "Service_token_Index_00")
+  @@index([sessionToken], map: "Service_token_Index_00")
 }
 
-enum UseCase {
-  PASS   // reset pass
-  D2FA   // Disabling double verification
-  E2FA   // Enabled double verification
-  VEM    // Email verification
-}
-
-model config_auth {
+model ConfigAuth {
   id             Int      @id @default(autoincrement())
   https          Boolean?
   useEmail       Boolean?
@@ -112,16 +123,17 @@ model config_auth {
   updatedAt      DateTime @updatedAt
 }
 
-model sessions_auth {
+model Session  {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId         String   @db.Uuid
-  jwt            String   @unique
-  expireAt       Int
+  sessionToken   String   @unique
+  expires        Int
   last_activity  DateTime?
   is_active      Boolean  @default(true)
   ip             String?  
   createdAt      DateTime @default(now())
-  user           users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 

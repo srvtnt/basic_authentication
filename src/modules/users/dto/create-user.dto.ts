@@ -4,7 +4,6 @@ import {
   IsEmail,
   MinLength,
   MaxLength,
-  IsBoolean,
   IsOptional,
   IsInt,
 } from 'class-validator';
@@ -32,10 +31,9 @@ export class CreateUserDto {
   @MaxLength(16)
   password: string;
 
-  @IsNotEmpty()
-  @IsBoolean()
+  @IsString()
   @IsOptional()
-  force_new_pass?: boolean;
+  image?: string;
 
   @IsNotEmpty()
   @IsInt()

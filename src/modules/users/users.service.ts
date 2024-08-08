@@ -5,7 +5,7 @@ import { PrismaService } from 'src/common/prisma/prisma.service';
 import { ConfigAuthService } from '../config_auth/config_auth.service';
 import { encrypt, verified } from 'src/common/utils/bcryptHandle';
 import { getExpiry } from 'src/common/utils/dateTimeUtility';
-import { Users } from './entities/user.entity';
+import { User } from './entities/user.entity';
 import { UpdateUserProfileDto } from './dto/updateProfile.dto';
 import {
   UpdateUserPasswordByAdmin,
@@ -21,14 +21,14 @@ export class UsersService {
     private readonly configAuthService: ConfigAuthService,
   ) {}
 
-  async findUserByUsername(username: string): Promise<Users> {
+  async findUserByUsername(username: string): Promise<User> {
     try {
-      const res = await this.prisma.users.findFirst({
+      const res = await this.prisma.user.findFirst({
         where: {
           username: username,
         },
         include: {
-          roles: {
+          role: {
             include: {
               rol: {
                 select: {
@@ -51,11 +51,11 @@ export class UsersService {
         password: res.password,
         lastpass: res.lastpass,
         expirepass: res.expirepass,
-        force_new_pass: res.force_new_pass,
         twoFA: res.twoFA,
-        isEmailVerified: res.isEmailVerified,
+        emailVerified: res.emailVerified,
+        image: res.image,
         status: res.status,
-        rol: res.roles[0].rol,
+        rol: res.role[0].rol,
       };
 
       return data;
@@ -64,13 +64,13 @@ export class UsersService {
     }
   }
 
-  async findUserById(id: string): Promise<Users> {
-    const res = await this.prisma.users.findFirst({
+  async findUserById(id: string): Promise<User> {
+    const res = await this.prisma.user.findFirst({
       where: {
         id: id,
       },
       include: {
-        roles: {
+        role: {
           include: {
             rol: {
               select: {
@@ -93,23 +93,23 @@ export class UsersService {
       password: res.password,
       lastpass: res.lastpass,
       expirepass: res.expirepass,
-      force_new_pass: res.force_new_pass,
       twoFA: res.twoFA,
-      isEmailVerified: res.isEmailVerified,
+      emailVerified: res.emailVerified,
+      image: res.image,
       status: res.status,
-      rol: res.roles[0].rol,
+      rol: res.role[0].rol,
     };
 
     return data;
   }
 
-  async findOne(id: string): Promise<Users> {
-    const res = await this.prisma.users.findFirst({
+  async findOne(id: string): Promise<User> {
+    const res = await this.prisma.user.findFirst({
       where: {
         id: id,
       },
       include: {
-        roles: {
+        role: {
           include: {
             rol: {
               select: {
@@ -130,25 +130,19 @@ export class UsersService {
       email: res.email,
       phone: res.phone,
       twoFA: res.twoFA,
-      isEmailVerified: res.isEmailVerified,
+      emailVerified: res.emailVerified,
+      image: res.image,
       status: res.status,
-      rol: res.roles[0].rol,
+      rol: res.role[0].rol,
     };
 
     return data;
   }
 
-  async create(createUserDto: CreateUserDto): Promise<Users> {
+  async create(createUserDto: CreateUserDto): Promise<User> {
     try {
-      const {
-        username,
-        fullname,
-        email,
-        phone,
-        password,
-        force_new_pass,
-        rol_id,
-      } = createUserDto; //destructure
+      const { username, fullname, email, phone, password, image, rol_id } =
+        createUserDto; //destructure
 
       const findConfigAuth = await this.configAuthService.findAll(); //look for the general auth configuration
       const names = fullname.split(' ');
@@ -163,7 +157,7 @@ export class UsersService {
       const expirePass = getExpiry(findConfigAuth.time_life_pass);
 
       //create user
-      const res = await this.prisma.users.create({
+      const res = await this.prisma.user.create({
         data: {
           username: username,
           fullname: fullname,
@@ -172,9 +166,9 @@ export class UsersService {
           password: hashPassword,
           lastpass: [`${hashPassword}`],
           expirepass: expirePass,
-          force_new_pass: force_new_pass === undefined ? false : force_new_pass,
+          image: image === undefined ? null : image,
           status: 'ACTIVE',
-          roles: {
+          role: {
             create: {
               rol_id: rol_id,
             },
@@ -187,7 +181,7 @@ export class UsersService {
           },
         },
         include: {
-          roles: {
+          role: {
             include: {
               rol: {
                 select: {
@@ -207,7 +201,7 @@ export class UsersService {
         email: res.email,
         phone: res.phone,
         status: res.status,
-        rol: res.roles[0].rol,
+        rol: res.role[0].rol,
         createdAt: res.createdAt,
       };
       return data;
@@ -216,10 +210,10 @@ export class UsersService {
     }
   }
 
-  async findAll(): Promise<Users[]> {
-    const res: any = await this.prisma.users.findMany({
+  async findAll(): Promise<User[]> {
+    const res: any = await this.prisma.user.findMany({
       include: {
-        roles: {
+        role: {
           include: {
             rol: {
               select: {
@@ -239,15 +233,15 @@ export class UsersService {
         email: item.email,
         phone: item.phone,
         status: item.status,
-        rol: item.roles[0].rol,
+        rol: item.role[0].rol,
         createdAt: item.createdAt,
       };
     });
     return data;
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<Users> {
-    return await this.prisma.users.update({
+  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+    return await this.prisma.user.update({
       where: {
         id,
       },
@@ -315,7 +309,7 @@ export class UsersService {
       lastpass.push(hastPassword);
     }
 
-    const res = await this.prisma.users.update({
+    const res = await this.prisma.user.update({
       where: {
         id: id,
       },
@@ -370,7 +364,7 @@ export class UsersService {
       lastpass.push(hastPassword);
     }
 
-    const res = await this.prisma.users.update({
+    const res = await this.prisma.user.update({
       where: {
         id: id,
       },
@@ -386,12 +380,12 @@ export class UsersService {
     return 'password updated successfully';
   }
 
-  async remove(id: string): Promise<Users> {
+  async remove(id: string): Promise<User> {
     const find = await this.findUserById(id);
     if (find === null)
       throw new HttpException('User not exists', HttpStatus.BAD_REQUEST); //If the user exists I return an error
 
-    return await this.prisma.users.delete({
+    return await this.prisma.user.delete({
       where: {
         id: id,
       },
@@ -407,7 +401,7 @@ export class UsersService {
     if (find === null)
       throw new HttpException('User not exists', HttpStatus.BAD_REQUEST); //If the user exists I return an error
 
-    const userRole = await this.prisma.users_roles.findFirst({
+    const userRole = await this.prisma.userRole.findFirst({
       where: {
         user_id: id,
       },
@@ -417,7 +411,7 @@ export class UsersService {
       throw new HttpException('User role not found', HttpStatus.BAD_REQUEST);
     }
 
-    const res = await this.prisma.users_roles.update({
+    const res = await this.prisma.userRole.update({
       where: {
         id: userRole.id,
       },
