@@ -1,10 +1,10 @@
 export interface ValidationInput {
-  userId: string;
+  user_id: string;
   ip: string;
 }
 
 export interface VerificationToken {
-  sessionToken: string;
+  session_token: string;
   code: number;
   identifier: string;
   expires: Date;

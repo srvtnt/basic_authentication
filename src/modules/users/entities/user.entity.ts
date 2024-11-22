@@ -7,13 +7,11 @@ export class User {
   email: string;
   phone?: string;
   password?: string;
-  lastpass?: string[];
-  expirepass?: Date;
-  twoFA?: boolean;
-  emailVerified?: Date;
+  two_fa?: boolean;
+  email_verified?: Date;
   image?: string;
   status?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+  created_at?: Date;
+  updated_at?: Date;
   rol?: Role;
 }

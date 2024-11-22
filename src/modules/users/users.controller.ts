@@ -14,7 +14,6 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { Auth } from '../auth/decorators/auth.decorator';
 import { Role } from '../auth/types/roles.enum';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth-guard';
-import { UpdateUserProfileDto } from './dto/updateProfile.dto';
 import {
   UpdateUserPasswordByAdmin,
   UpdateUserPasswordDto,
@@ -40,7 +39,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @Get('findOne/:id')
   findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+    return this.usersService.findUserById(id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -49,14 +48,6 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Patch('update_profile/:id')
-  updateProfile(
-    @Param('id') id: string,
-    @Body() updateUserProfileDto: UpdateUserProfileDto,
-  ) {
-    return this.usersService.updateProfile(id, updateUserProfileDto);
-  }
 
   @UseGuards(JwtAuthGuard)
   @Patch('update_password/:id')

@@ -1,16 +1,8 @@
 import { PrismaClient } from '@prisma/client';
-import * as moment from 'moment';
 import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
-const getExpiry = (cant: number) => {
-  const createdAt = new Date();
-  const expiresAt = moment(createdAt).add(cant, 'days').toDate();
-  return expiresAt;
-};
-
 async function main() {
-  const expire_pass = getExpiry(365);
   const password = 'admin123';
   const hashPassword = await bcrypt.hash(password, 10);
   const roles = await prisma.role.createMany({
@@ -27,9 +19,7 @@ async function main() {
       email: 'admin@example.com',
       phone: '0212000000',
       password: hashPassword,
-      lastpass: [hashPassword],
-      expirepass: expire_pass,
-      emailVerified: new Date(),
+      email_verified: new Date(),
       status: 'ACTIVE',
       role: {
         create: {
@@ -44,18 +34,7 @@ async function main() {
       },
     },
   });
-
-  const config = await prisma.configAuth.create({
-    data: {
-      https: false,
-      useEmail: false,
-      max_last_pass: 3,
-      time_life_pass: 90,
-      twoFA: false,
-      time_life_code: 900,
-    },
-  });
-  console.log({ roles, user, config });
+  console.log({ roles, user });
 }
 main()
   .then(async () => {

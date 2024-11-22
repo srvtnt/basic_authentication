@@ -3,9 +3,9 @@ import { IsString, IsNotEmpty } from 'class-validator';
 export class LogoutDtoInput {
   @IsNotEmpty()
   @IsString()
-  userId: string;
+  user_id: string;
 
   @IsNotEmpty()
   @IsString()
-  refreshToken: string;
+  refresh_token: string;
 }

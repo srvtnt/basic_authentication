@@ -1,7 +1,7 @@
 import { IsInt, IsJSON, IsOptional, IsString } from 'class-validator';
 import { Prisma } from '@prisma/client';
 
-export class UpdateUserProfileDto {
+export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   firstname?: string;
@@ -36,7 +36,7 @@ export class UpdateUserProfileDto {
 
   @IsInt()
   @IsOptional()
-  localityId?: number;
+  locality_id?: number;
 
   @IsString()
   @IsOptional()

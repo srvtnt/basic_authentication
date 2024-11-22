@@ -1,19 +1,15 @@
 export interface LoginAuthResponse {
   code?: number;
-  twoFa?: boolean;
-  accessToken?: string;
-  expire_pass?: boolean;
-  refreshToken?: string;
-  accessTokenExpiration?: number;
+  access_token?: string;
+  expiration?: number;
   msg?: string;
-  refreshTokenExpiration?: number;
-  tokenValidation?: string;
+  token_validation?: string;
   user?: UserLogin;
 }
 
 export interface SessionInput {
-  userId: string;
-  sessionToken: string;
+  user_id: string;
+  session_token: string;
   expires: number;
   last_activity?: Date;
   is_active?: boolean;

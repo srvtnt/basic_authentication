@@ -19,5 +19,5 @@ export class UpdateUserDto {
 
   @IsBoolean()
   @IsOptional()
-  twoFA?: boolean;
+  two_fa?: boolean;
 }

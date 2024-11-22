@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'src/common/prisma/prisma.service';
-import { LoginAuthInput } from './dto/login.dto';
+import { LoginDto} from './dto/login.dto';
 import { envs } from 'src/config';
 import {
   DecodeJwt,
@@ -10,7 +10,6 @@ import {
   VerificationToken,
 } from './types';
 import { UsersService } from '../users/users.service';
-import { ConfigAuthService } from '../config_auth/config_auth.service';
 import { compare } from 'bcrypt';
 import { RegisterAuthInput } from './dto/register.dto';
 import { LoginAuthResponse, SessionInput } from './types/login';
@@ -25,238 +24,191 @@ import {
   RecoveryPasswordDto,
 } from './dto/recoveryPassword.dto';
 import { sendMail } from 'src/common/utils/resend';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
   private readonly MAX_SESSIONS = 5; // Maximum number of active sessions
+  private readonly EXPIRES_CODE = 5; // Maximum number of active sessions
   constructor(
     private readonly prisma: PrismaService,
     private readonly userService: UsersService,
-    private readonly configAuthService: ConfigAuthService,
-
-    private jwtService: JwtService,
+    private readonly jwtService: JwtService,
   ) {}
 
-  decodeClientIp(ip: string): string {
+  //metodo para obtener la ip desde donde se hace la peticion
+  private decodeClientIp(ip: string): string {
     if (ip.startsWith('::ffff:')) {
       return ip.substring(7);
     }
     return ip;
   }
 
-  decodeToken(token: string): DecodeJwt {
+   // Método para decodificar el token y obtener la expiración
+   private decodeToken(token: string): { exp: number } | null {
     try {
-      const decoded = this.jwtService.decode(token);
+      const decoded = this.jwtService.decode(token) as { exp: number };
       return decoded;
     } catch (error) {
-      throw new Error('Invalid token');
+      return null; // Manejo de errores si la decodificación falla
     }
   }
 
-  async verifyAccessToken(token: string): Promise<boolean> {
+
+  //sirve para verificar si un token es valido o no
+  private async verifyToken(token: string, secret?: string): Promise<boolean> {
     try {
-      // Check refresh token validity
-      await this.jwtService.verifyAsync(token);
+      await this.jwtService.verifyAsync(token, { secret });
       return true;
     } catch (error) {
       return false;
     }
   }
 
-  async verifyRefreshToken(refreshToken: string): Promise<boolean> {
-    try {
-      // Check refresh token validity
-      await this.jwtService.verifyAsync(refreshToken, {
-        secret: envs.jwtRefresh,
-      });
-      return true;
-    } catch (error) {
-      return false;
-    }
+  //sirve para generar un token ya sea acceso o de refresh o de valacion 
+  private async generateToken(payload: JwtPayload, secret?: string, expiresIn?: string): Promise<{ token: string; expiresAt: number }> {
+    const token = await this.jwtService.signAsync(payload, { secret, expiresIn });
+  
+    // Decodificar el token para obtener la expiración
+    const decoded = this.decodeToken(token);
+    const expiresAt = decoded ? decoded.exp : null;
+
+    return { token, expiresAt };
+   
   }
 
-  async verifyValidationToken(validationToken: string): Promise<boolean> {
-    try {
-      // Check refresh token validity
-      await this.jwtService.verifyAsync(validationToken, {
-        secret: envs.jwtValidation,
-      });
-      return true;
-    } catch (error) {
-      return false;
-    }
+  //metodo para generar un acces token y refreshtoken a la vez 
+  private async getTokens(payload: JwtPayload):Promise<{ access_token: string; refreshToken: string; accessExpiresAt?: number; refreshExpiresAt?: number }> {
+    // Generar ambos tokens y sus respectivas fechas de expiración
+    const [accessTokenData, refreshTokenData] = await Promise.all([
+      this.generateToken(payload, envs.jwtSecret, envs.expire_token), // Token de acceso
+      this.generateToken(payload, envs.jwtRefresh, envs.time_expires_refreshtoken), // Token de refresco
+  ]);
+
+  return {
+      access_token: accessTokenData.token,
+      refreshToken: refreshTokenData.token,
+      accessExpiresAt: accessTokenData.expiresAt, // Fecha de expiración del token de acceso
+      refreshExpiresAt: refreshTokenData.expiresAt, // Fecha de expiración del token de refresco
+  };
   }
 
-  async generateAccesToken(payload: JwtPayload): Promise<string> {
-    return await this.jwtService.signAsync(payload);
-  }
 
-  async generateRefresToken(payload: JwtPayload): Promise<string> {
-    return await this.jwtService.signAsync(payload, {
-      secret: envs.jwtRefresh,
-      expiresIn: '24h',
-    });
-  }
+  //METODO QUE GENERA UN COODIGO DE VALIDACION CON UN TOKEN
+  async createCodeValidation(validationInput: ValidationInput): Promise<{ tokenValidate: string; code: number }> {
+    const { user_id, ip } = validationInput;
 
-  async generateTokenValidation(
-    payload: JwtPayload,
-    expirationSeconds: number,
-  ): Promise<string> {
-    return await this.jwtService.signAsync(payload, {
-      secret: envs.jwtValidation,
-      expiresIn: expirationSeconds,
-    });
-  }
-
-  async getTokens(
-    payload: JwtPayload,
-  ): Promise<{ access_token: string; refreshToken: string }> {
-    const [access_token, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload),
-      this.jwtService.signAsync(payload, {
-        secret: envs.jwtRefresh,
-        expiresIn: '24h',
-      }),
-    ]);
-
-    return {
-      access_token,
-      refreshToken,
-    };
-  }
-
-  async createValidation(
-    validationInput: ValidationInput,
-  ): Promise<{ tokenValidate: string; code: number }> {
-    const { userId, ip } = validationInput;
-    const findVerification = await this.findVerificationToken(userId);
-
-    if (findVerification) {
-      await this.deleteTokenVerification(findVerification.sessionToken);
+    // Eliminar el token de verificación existente
+    const existingVerification = await this.findVerificationToken(user_id);
+    if (existingVerification) {
+      await this.deleteTokenVerification(existingVerification.session_token);
     }
 
-    const findUser = await this.userService.findUserById(userId);
-
+    const user = await this.userService.findUserById(user_id);
+    
     const payload = {
       iss: envs.issuer,
-      id: findUser.id,
-      user: findUser.username,
-      email: findUser.email,
-      role: findUser.rol.name,
+      id: user.id,
+      user: user.username,
+      email: user.email,
+      role: user.rol.name,
     };
 
     const ipClient = this.decodeClientIp(ip);
-    const findConfigAuth = await this.configAuthService.findAll(); //look for the general auth configuration
-
-    const generateToken = await this.generateTokenValidation(
-      payload,
-      findConfigAuth.time_life_code,
-    );
+    const tokenValidate = await this.generateToken(payload, envs.jwtValidation);
     const codeOtp = generateOTP();
-
-    const expires = getExpiryCode(findConfigAuth.time_life_code);
-    const res = await this.prisma.verificationToken.create({
+    
+    const expires = getExpiryCode(envs.expire_code);
+    
+    await this.prisma.verificationToken.create({
       data: {
-        sessionToken: generateToken,
+        session_token: tokenValidate.token,
         code: codeOtp,
-        identifier: userId,
-        expires: expires,
+        identifier: user_id,
+        expires,
         ip: ipClient,
       },
     });
-    if (res === null)
-      throw new HttpException(
-        'Failed to create verification token',
-        HttpStatus.NOT_FOUND,
-      );
 
-    return {
-      tokenValidate: generateToken,
-      code: codeOtp,
-    };
+    return { tokenValidate: tokenValidate.token, code: codeOtp };
   }
 
   async createSession(sessionInput: SessionInput): Promise<string> {
-    const { sessionToken, userId, expires, is_active, ip } = sessionInput;
+    const { session_token, user_id } = sessionInput;
 
-    // Check how many active sessions the user has
-    const activeSessions = await this.prisma.session.count({
-      where: { userId: userId, is_active: true },
+    // Limitar sesiones activas
+    await this.limitActiveSessions(user_id);
+
+    const res = await this.prisma.session.create({
+      data: sessionInput,
     });
 
-    // If the user already has the maximum number of sessions, delete the oldest one
-    if (activeSessions >= this.MAX_SESSIONS) {
+    if (!res) throw new HttpException('Failed to create session', HttpStatus.NOT_FOUND);
+    
+    return 'Session created successfully';
+  }
+
+  private async limitActiveSessions(userId: string): Promise<void> {
+    const activeSessionsCount = await this.prisma.session.count({
+      where: { user_id: userId, is_active: true },
+    });
+
+    if (activeSessionsCount >= envs.max_sesion_user) {
       const oldestSession = await this.prisma.session.findFirst({
-        where: { userId: userId, is_active: true },
-        orderBy: { createdAt: 'asc' }, // Assuming you have a createdAt field
+        where: { user_id: userId, is_active: true },
+        orderBy: { createdAt: 'asc' },
       });
 
       if (oldestSession) {
         await this.prisma.session.update({
-          where: { id: oldestSession.id }, // delete the session if you prefer
-          data: {
-            is_active: false,
-          },
+          where: { id: oldestSession.id },
+          data: { is_active: false },
         });
       }
     }
-
-    // Create the new session
-    const res = await this.prisma.session.create({
-      data: {
-        userId: userId,
-        sessionToken: sessionToken,
-        expires: expires,
-        is_active: is_active,
-        ip: ip,
-      },
-    });
-    if (res === null)
-      throw new HttpException('Failed to create session', HttpStatus.NOT_FOUND);
-    return 'successful create session';
   }
 
-  async findVerificationToken(userdId: string): Promise<VerificationToken> {
+  //metodo que valida si existe un token ya creado en la validacion
+  private async findVerificationToken(userId: string): Promise<VerificationToken | null> {
     return await this.prisma.verificationToken.findFirst({
-      where: {
-        identifier: userdId,
-      },
+      where: { identifier: userId },
     });
   }
 
-  async deleteTokenVerification(sessionToken: string) {
-    return await this.prisma.verificationToken.delete({
-      where: {
-        sessionToken,
-      },
+  //metodo que elimina si existe un token ya creado en la validacion
+  async deleteTokenVerification(session_token: string): Promise<void> {
+    await this.prisma.verificationToken.delete({
+      where: { session_token },
     });
   }
 
-  async logout(userId: string, token: string): Promise<String> {
-    const verifiedToken = await this.verifyRefreshToken(token);
-    if (!verifiedToken)
-      throw new HttpException('Invalid refresh token', HttpStatus.NOT_FOUND);
+  async logout(user_id: string, token: string): Promise<string> {
+    const isValidRefreshToken = await this.verifyToken(token, envs.jwtRefresh);
+    
+    if (!isValidRefreshToken) throw new HttpException('Invalid refresh token', HttpStatus.NOT_FOUND);
 
-    const res = await this.prisma.session.update({
-      where: { userId: userId, is_active: true, sessionToken: token },
-      data: {
-        is_active: false,
-      },
+    const res = await this.prisma.session.updateMany({
+      where: { user_id, is_active: true, session_token: token },
+      data: { is_active: false },
     });
 
-    if (!res)
-      throw new HttpException('No active session found', HttpStatus.NOT_FOUND);
+    if (!res.count) throw new HttpException('No active session found', HttpStatus.NOT_FOUND);
 
     return 'Logout successful';
   }
 
-  async login(
-    loginAuthInput: LoginAuthInput,
-    ip?: string,
-  ): Promise<LoginAuthResponse> {
-    const { username, password } = loginAuthInput;
+
+
+  async login(loginDto: LoginDto, ip?: string): Promise<LoginAuthResponse> {
+    const { username, email, password } = loginDto;
     let msg: string;
-    const findUser = await this.userService.findUserByUsername(username);
+    let findUser: User;
+
+    if (username) {
+      findUser = await this.userService.findUserByUsername(username, true);
+    } else if (email) {
+      findUser = await this.userService.findUserById(email, true);
+    }
 
     if (findUser === null)
       throw new HttpException('user not found', HttpStatus.NOT_FOUND);
@@ -277,11 +229,11 @@ export class AuthService {
 
     const ipClient = this.decodeClientIp(ip);
 
-    if (findUser.twoFA) {
+    if (findUser.two_fa) {
       // Check if double verification is active and if the email is already validated
       //Generates a token and creates a record to validate which is sent by email to be able to enter and obtain a valid token
-      const res = await this.createValidation({
-        userId: findUser.id,
+      const res = await this.createCodeValidation({
+        user_id: findUser.id,
         ip: ipClient,
       });
       const dataEmail = {
@@ -306,42 +258,27 @@ export class AuthService {
       );
 
       return {
-        twoFa: true,
-        tokenValidation: res.tokenValidate,
+        token_validation: res.tokenValidate,
         msg: 'You must validate your income by email',
       };
-
-      //falta el envio por correo del codigo y quitar de la respuesta el codigo
     }
 
-    //valid date expires password
-    const expiredPass = isDateExpired(findUser.expirepass);
-    if (expiredPass) {
-      msg = 'Password needs to be updated';
-    } else {
-      msg = 'successful entry';
-    }
 
     //generates the access token and the refresh token, extract token expiration time
-    const { access_token, refreshToken }: Record<string, string> =
-      await this.getTokens(payload);
-    const decodeToken = this.decodeToken(access_token);
-    const decodeRefresh = this.decodeToken(refreshToken);
+    const { access_token,refreshToken, accessExpiresAt, refreshExpiresAt } = await this.getTokens(payload);
+
 
     await this.createSession({
-      sessionToken: refreshToken,
-      userId: findUser.id,
-      expires: decodeRefresh.exp,
+      session_token: refreshToken,
+      user_id: findUser.id,
+      expires: refreshExpiresAt,
       is_active: true,
       ip: ipClient,
     });
 
     return {
-      accessToken: access_token,
-      accessTokenExpiration: decodeToken.exp,
-      refreshToken: refreshToken,
-      refreshTokenExpiration: decodeRefresh.exp,
-      msg: msg,
+      access_token: access_token,
+      expiration: accessExpiresAt,
       user: {
         id: findUser.id,
         username: findUser.username,
@@ -353,247 +290,248 @@ export class AuthService {
     };
   }
 
-  /// register user
-  async register(registerAuthInput: RegisterAuthInput) {
-    return await this.userService.create(registerAuthInput);
-  }
+  // /// register user
+  // async register(registerAuthInput: RegisterAuthInput) {
+  //   return await this.userService.create(registerAuthInput);
+  // }
 
-  //refresh token
+  // //refresh token
 
-  async validateSession(token: string, ip: string): Promise<LoginAuthResponse> {
-    // Verificar la validez del token de refresco
-    const validRefreshToken = await this.verifyRefreshToken(token);
-    if (!validRefreshToken)
-      throw new HttpException('Invalid refresh token', HttpStatus.UNAUTHORIZED);
+  // async validateSession(token: string, ip: string): Promise<LoginAuthResponse> {
+  //   // Verificar la validez del token de refresco
+  //   const validRefreshToken = await this.verifyRefreshToken(token);
+  //   if (!validRefreshToken)
+  //     throw new HttpException('Invalid refresh token', HttpStatus.UNAUTHORIZED);
 
-    const decodeRefreshToken = this.decodeToken(token);
-    // Verificar si la sesión está activa
-    const session = await this.prisma.session.findFirst({
-      where: {
-        userId: decodeRefreshToken.id,
-        sessionToken: token,
-        is_active: true,
-      },
-    });
+  //   const decodeRefreshToken = this.decodeToken(token);
+  //   // Verificar si la sesión está activa
+  //   const session = await this.prisma.session.findFirst({
+  //     where: {
+  //       user_id: decodeRefreshToken.id,
+  //       session_token: token,
+  //       is_active: true,
+  //     },
+  //   });
 
-    if (!session) {
-      throw new HttpException(
-        'No active session found',
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
+  //   if (!session) {
+  //     throw new HttpException(
+  //       'No active session found',
+  //       HttpStatus.UNAUTHORIZED,
+  //     );
+  //   }
 
-    // Verificar si la sesión ha expirado
-    const currentTime = Math.floor(Date.now() / 1000); // Tiempo actual en segundos
-    if (session.expires < currentTime) {
-      throw new HttpException('Session has expired', HttpStatus.UNAUTHORIZED);
-    }
+  //   // Verificar si la sesión ha expirado
+  //   const currentTime = Math.floor(Date.now() / 1000); // Tiempo actual en segundos
+  //   if (session.expires < currentTime) {
+  //     throw new HttpException('Session has expired', HttpStatus.UNAUTHORIZED);
+  //   }
 
-    //build the data for the token
-    const payload = {
-      iss: envs.issuer,
-      id: decodeRefreshToken.id,
-      user: decodeRefreshToken.user,
-      email: decodeRefreshToken.email,
-      role: decodeRefreshToken.role,
-    };
+  //   //build the data for the token
+  //   const payload = {
+  //     iss: envs.issuer,
+  //     id: decodeRefreshToken.id,
+  //     user: decodeRefreshToken.user,
+  //     email: decodeRefreshToken.email,
+  //     role: decodeRefreshToken.role,
+  //   };
 
-    const ipClient = this.decodeClientIp(ip);
+  //   const ipClient = this.decodeClientIp(ip);
 
-    //generates the access token , extract token expiration time
-    const access_token = await this.generateAccesToken(payload);
-    const decodeToken = this.decodeToken(access_token);
-    await this.prisma.session.update({
-      where: {
-        sessionToken: token,
-      },
-      data: {
-        last_activity: new Date(),
-        ip: ipClient,
-      },
-    });
+  //   //generates the access token , extract token expiration time
+  //   const access_token = await this.generateAccesToken(payload);
+  //   const decodeToken = this.decodeToken(access_token);
+  //   await this.prisma.session.update({
+  //     where: {
+  //       session_token: token,
+  //     },
+  //     data: {
+  //       last_activity: new Date(),
+  //       ip: ipClient,
+  //     },
+  //   });
 
-    return {
-      accessToken: access_token,
-      accessTokenExpiration: decodeToken.exp,
-      msg: 'successful entry',
-    };
-  }
+  //   return {
+  //     accessToken: access_token,
+  //     accessTokenExpiration: decodeToken.exp,
+  //     msg: 'successful entry',
+  //   };
+  // }
 
-  //validate code session
-  async validateCode(code: number, token: string): Promise<boolean> {
-    // Verificar la validez del token
-    const validToken = await this.verifyValidationToken(token);
+  // //validate code session
+  // async validateCode(code: number, token: string): Promise<boolean> {
+  //   // Verificar la validez del token
+  //   const validToken = await this.verifyValidationToken(token);
 
-    if (!validToken)
-      throw new HttpException(
-        'Invalid validate token ',
-        HttpStatus.UNAUTHORIZED,
-      );
+  //   if (!validToken)
+  //     throw new HttpException(
+  //       'Invalid validate token ',
+  //       HttpStatus.UNAUTHORIZED,
+  //     );
 
-    const res = await this.prisma.verificationToken.findFirst({
-      where: {
-        code: code,
-        sessionToken: token,
-      },
-    });
-    if (res === null)
-      throw new HttpException('invalid code', HttpStatus.UNAUTHORIZED);
+  //   const res = await this.prisma.verificationToken.findFirst({
+  //     where: {
+  //       code: code,
+  //       session_token: token,
+  //     },
+  //   });
+  //   if (res === null)
+  //     throw new HttpException('invalid code', HttpStatus.UNAUTHORIZED);
 
-    const expiresCode = isDateExpired(res.expires);
+  //   const expiresCode = isDateExpired(res.expires);
 
-    if (expiresCode)
-      throw new HttpException('code expired', HttpStatus.UNAUTHORIZED);
+  //   if (expiresCode)
+  //     throw new HttpException('code expired', HttpStatus.UNAUTHORIZED);
 
-    if (validToken && res !== null && !expiresCode) {
-      await this.prisma.verificationToken.delete({
-        where: {
-          sessionToken: token,
-          code: code,
-        },
-      });
-      return true;
-    } else {
-      throw new HttpException('invalid code', HttpStatus.UNAUTHORIZED);
-    }
-  }
+  //   if (validToken && res !== null && !expiresCode) {
+  //     await this.prisma.verificationToken.delete({
+  //       where: {
+  //         session_token: token,
+  //         code: code,
+  //       },
+  //     });
+  //     return true;
+  //   } else {
+  //     throw new HttpException('invalid code', HttpStatus.UNAUTHORIZED);
+  //   }
+  // }
 
-  async validateCodeLogin(
-    code: number,
-    token: string,
-    ip?: string,
-  ): Promise<LoginAuthResponse> {
-    // Verificar la validez del token de refresco
-    const validateToken = await this.validateCode(code, token);
+  // async validateCodeLogin(
+  //   code: number,
+  //   token: string,
+  //   ip?: string,
+  // ): Promise<LoginAuthResponse> {
+  //   // Verificar la validez del token de refresco
+  //   const validateToken = await this.validateCode(code, token);
 
-    if (!validateToken)
-      throw new HttpException('invalid code', HttpStatus.UNAUTHORIZED);
+  //   if (!validateToken)
+  //     throw new HttpException('invalid code', HttpStatus.UNAUTHORIZED);
 
-    const ipClient = this.decodeClientIp(ip);
-    const decodeValidateToken = this.decodeToken(token);
+  //   const ipClient = this.decodeClientIp(ip);
+  //   const decodeValidateToken = this.decodeToken(token);
 
-    const payload = {
-      iss: envs.issuer,
-      id: decodeValidateToken.id,
-      user: decodeValidateToken.user,
-      email: decodeValidateToken.email,
-      role: decodeValidateToken.role,
-    };
+  //   const payload = {
+  //     iss: envs.issuer,
+  //     id: decodeValidateToken.id,
+  //     user: decodeValidateToken.user,
+  //     email: decodeValidateToken.email,
+  //     role: decodeValidateToken.role,
+  //   };
 
-    //generates the access token and the refresh token, extract token expiration time
-    const { access_token, refreshToken }: Record<string, string> =
-      await this.getTokens(payload);
-    const decodeToken = this.decodeToken(access_token);
-    const decodeRefresh = this.decodeToken(refreshToken);
+  //   //generates the access token and the refresh token, extract token expiration time
+  //   const { access_token, refreshToken }: Record<string, string> =
+  //     await this.getTokens(payload);
+  //   const decodeToken = this.decodeToken(access_token);
+  //   const decodeRefresh = this.decodeToken(refreshToken);
 
-    await this.createSession({
-      sessionToken: refreshToken,
-      userId: decodeValidateToken.id,
-      expires: decodeRefresh.exp,
-      is_active: true,
-      ip: ipClient,
-    });
+  //   await this.createSession({
+  //     session_token: refreshToken,
+  //     user_id: decodeValidateToken.id,
+  //     expires: decodeRefresh.exp,
+  //     is_active: true,
+  //     ip: ipClient,
+  //   });
 
-    const findUser = await this.userService.findUserById(
-      decodeValidateToken.id,
-    );
-    if (findUser.emailVerified === null) {
-      await this.prisma.user.update({
-        where: {
-          id: decodeValidateToken.id,
-        },
-        data: {
-          emailVerified: new Date(),
-          twoFA: true,
-        },
-      });
-    }
+  //   const findUser = await this.userService.findUserById(
+  //     decodeValidateToken.id,
+  //   );
+  //   if (findUser.emailVerified === null) {
+  //     await this.prisma.user.update({
+  //       where: {
+  //         id: decodeValidateToken.id,
+  //       },
+  //       data: {
+  //         emailVerified: new Date(),
+  //         two_fa: true,
+  //       },
+  //     });
+  //   }
 
-    return {
-      accessToken: access_token,
-      accessTokenExpiration: decodeToken.exp,
-      refreshToken: refreshToken,
-      refreshTokenExpiration: decodeRefresh.exp,
-      msg: 'successful entry',
-      user: {
-        id: findUser.id,
-        username: findUser.username,
-        fullname: findUser.fullname,
-        email: findUser.email,
-        phone: findUser.phone,
-        role: findUser.rol,
-      },
-    };
-  }
+  //   return {
+  //     accessToken: access_token,
+  //     accessTokenExpiration: decodeToken.exp,
+  //     refreshToken: refreshToken,
+  //     refreshTokenExpiration: decodeRefresh.exp,
+  //     msg: 'successful entry',
+  //     user: {
+  //       id: findUser.id,
+  //       username: findUser.username,
+  //       fullname: findUser.fullname,
+  //       email: findUser.email,
+  //       phone: findUser.phone,
+  //       role: findUser.rol,
+  //     },
+  //   };
+  // }
 
-  async codeRecoveryPassword(ip: string, emailPasswordDto: EmailPasswordDto) {
-    const { email } = emailPasswordDto;
-    const findUser = await this.prisma.user.findFirst({
-      where: {
-        email: email,
-      },
-      include: {
-        role: {
-          include: {
-            rol: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-      },
-    });
-    if (findUser === null)
-      throw new HttpException(
-        'Email not registered for any user ',
-        HttpStatus.UNAUTHORIZED,
-      );
+  // async codeRecoveryPassword(ip: string, emailPasswordDto: EmailPasswordDto) {
+  //   const { email } = emailPasswordDto;
+  //   const findUser = await this.prisma.user.findFirst({
+  //     where: {
+  //       email: email,
+  //     },
+  //     include: {
+  //       role: {
+  //         include: {
+  //           rol: {
+  //             select: {
+  //               name: true,
+  //             },
+  //           },
+  //         },
+  //       },
+  //     },
+  //   });
+  //   if (findUser === null)
+  //     throw new HttpException(
+  //       'Email not registered for any user ',
+  //       HttpStatus.UNAUTHORIZED,
+  //     );
 
-    const res = await this.createValidation({
-      userId: findUser.id,
-      ip: ip,
-    });
+  //   const res = await this.createValidation({
+  //     user_id: findUser.id,
+  //     ip: ip,
+  //   });
 
-    const dataEmail = {
-      from: envs.supportEmail,
-      to: [`${findUser.email}`],
-      subject: 'CÓDGIO DE VALIDACIÓN RECUPERACIÓN CONTRASEÑA',
-      html: `
-      <div>
-          <h2>Hola, ${findUser.fullname}</h2>
-          <p>Este es un mensaje contiene el código de validación para recuperar tu contraseña.</p>
-          <p style="font-size: 16px;"><strong>Tu código es: ${res.code}</strong></p>
-          <p>¡Gracias por favor no responder este mensaje!</p>
-      </div>
-      `,
-    };
+  //   const dataEmail = {
+  //     from: envs.supportEmail,
+  //     to: [`${findUser.email}`],
+  //     subject: 'CÓDGIO DE VALIDACIÓN RECUPERACIÓN CONTRASEÑA',
+  //     html: `
+  //     <div>
+  //         <h2>Hola, ${findUser.fullname}</h2>
+  //         <p>Este es un mensaje contiene el código de validación para recuperar tu contraseña.</p>
+  //         <p style="font-size: 16px;"><strong>Tu código es: ${res.code}</strong></p>
+  //         <p>¡Gracias por favor no responder este mensaje!</p>
+  //     </div>
+  //     `,
+  //   };
 
-    await sendMail(
-      dataEmail.from,
-      dataEmail.to,
-      dataEmail.subject,
-      dataEmail.html,
-    );
+  //   await sendMail(
+  //     dataEmail.from,
+  //     dataEmail.to,
+  //     dataEmail.subject,
+  //     dataEmail.html,
+  //   );
 
-    return {
-      twoFa: true,
-      tokenValidation: res.tokenValidate,
-      msg: 'You must validate your income by email',
-    };
-  }
+  //   return {
+  //     two_fa: true,
+  //     tokenValidation: res.tokenValidate,
+  //     msg: 'You must validate your income by email',
+  //   };
+  // }
 
-  async validateCodePassword(code: number, token: string): Promise<string> {
-    // Verificar la validez del token de refresco
+  // async validateCodePassword(code: number, token: string): Promise<string> {
+  //   // Verificar la validez del token de refresco
 
-    const validateToken = await this.validateCode(code, token);
-    if (!validateToken)
-      throw new HttpException('invalid code', HttpStatus.UNAUTHORIZED);
-    return 'valid code';
-  }
+  //   const validateToken = await this.validateCode(code, token);
+  //   if (!validateToken)
+  //     throw new HttpException('invalid code', HttpStatus.UNAUTHORIZED);
+  //   return 'valid code';
+  // }
 
-  async recovery_password(recoveryPasswordDto: RecoveryPasswordDto) {
-    const { id, ...dtoWithoutId } = recoveryPasswordDto;
-    return await this.userService.updatePasswordByAdmin(id, dtoWithoutId);
-  }
+  // async recovery_password(recoveryPasswordDto: RecoveryPasswordDto) {
+  //   const { id, ...dtoWithoutId } = recoveryPasswordDto;
+  //   return await this.userService.updatePasswordByAdmin(id, dtoWithoutId);
+  // }
 }
+

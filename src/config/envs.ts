@@ -10,6 +10,10 @@ interface EnvVars {
   JWTVALIDATION: string;
   APIKEYRESEND?: string;
   SUPPORTEMAIL?: string;
+  EXPIRE_REFRESH_TOKEN: string;
+  MAX_SESSIONS_USER: number;
+  EXPIRES_CODE: number;
+  EXPIRE_TOKEN: string;
 }
 
 const envsSchema = joi
@@ -22,6 +26,10 @@ const envsSchema = joi
     JWTVALIDATION: joi.string().required(),
     APIKEYRESEND: joi.string(),
     SUPPORTEMAIL: joi.string(),
+    EXPIRE_REFRESH_TOKEN: joi.string(),
+    MAX_SESSIONS_USER: joi.number(),
+    EXPIRES_CODE: joi.number(),
+    EXPIRE_TOKEN: joi.string(),
   })
   .unknown(true);
 
@@ -42,4 +50,8 @@ export const envs = {
   jwtValidation: envVars.JWTVALIDATION,
   apyKeyResend: envVars.APIKEYRESEND,
   supportEmail: envVars.SUPPORTEMAIL,
+  time_expires_refreshtoken: envVars.EXPIRE_REFRESH_TOKEN,
+  max_sesion_user: envVars.MAX_SESSIONS_USER,
+  expire_code: envVars.EXPIRES_CODE,
+  expire_token: envVars.EXPIRE_TOKEN
 };
