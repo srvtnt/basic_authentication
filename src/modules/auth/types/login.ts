@@ -2,6 +2,8 @@ export interface LoginAuthResponse {
   code?: number;
   access_token?: string;
   expiration?: number;
+  refresh_token?: string;
+  expiration_refreshToken?: number;
   msg?: string;
   token_validation?: string;
   user?: UserLogin;

@@ -134,6 +134,7 @@ model AuditLog {
   user            User?     @relation(fields: [user_id], references: [id], onDelete: SetNull)
 
   @@index([timestamp], map: "AuditLog_Timestamp_Index")
+  @@index([user_id, action, timestamp], map: "AuditLog_UserAction_Index") // Índice adicional para búsquedas rápidas
 }
 
 // model states {

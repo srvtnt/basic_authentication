@@ -19,7 +19,17 @@ import {
   UpdateUserPasswordDto,
 } from './dto/updatePassword.dto';
 import { UpdateUserRolDto } from './dto/updateRol.dto';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 
+@ApiBearerAuth()
+@ApiUnauthorizedResponse({
+  description: 'Unauthorized Bearer Token Auth',
+})
+@ApiTags('users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -48,7 +58,6 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto);
   }
 
-
   @UseGuards(JwtAuthGuard)
   @Patch('update_password/:id')
   updatePassword(
@@ -58,7 +67,8 @@ export class UsersController {
     return this.usersService.updatePassword(id, updateUserPasswordDto);
   }
 
-  // @Auth(Role.ADMIN)
+  @UseGuards(JwtAuthGuard)
+  @Auth(Role.ADMIN)
   @Patch('update_password_byadmin/:id')
   updatePasswordByAdmin(
     @Param('id') id: string,
@@ -70,13 +80,15 @@ export class UsersController {
     );
   }
 
-  // @Auth(Role.ADMIN)
+  @UseGuards(JwtAuthGuard)
+  @Auth(Role.ADMIN)
   @Delete('delete/:id')
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
   }
 
-  // @Auth(Role.ADMIN)
+  @UseGuards(JwtAuthGuard)
+  @Auth(Role.ADMIN)
   @Patch('update_rol/:id')
   update_rol(
     @Param('id') id: string,

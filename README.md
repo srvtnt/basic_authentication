@@ -5,31 +5,45 @@
 [circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
 [circleci-url]: https://circleci.com/gh/nestjs/nest
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+<p align="center">SISTEMA BASICO DE AUTENTICACION EN NESTJS</p>
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+API de autenticación incluye varias funcionalidades importantes. Documentada con Swipper en /api-docs
+
+Login de Usuario
+Descripción: Autenticación usando usuario o email mas la contraseña, Devuelve un token de acceso y una cookie con el refresh token; si tiene activo el multifactor emite un token y envía un código al correo utilizando resend, esto genera un sesión, en efecto se permite hasta 5 sesiones abiertas, al intentar crear una nueva elimina la sesión mas antigua.
+
+Registro de Usuario
+Descripción: Devuelve el usuario registrado.
+
+Validación de Código de Login para MFA
+Descripción: Valida el código y devuelve un token y cookie con refresh, usuario.
+
+Refresh Token
+Descripción: Sirve para validar la sesión o en su defecto refrescar el token de acceso, Recibe la cookie, valida el refresh token y devuelve un nuevo access token.
+
+Código de Recuperación de Contraseña
+Descripción: Valida el correo y envía un código para recuperar por correo.
+
+Validación Código Contraseña
+Descripción: Recibe el código válido y devuelve un token para que pueda actualizar la contraseña.
+
+Recuperación de Contraseña
+Descripción: Valida y devuelve si fue efectivo el restablecimiento.
+
+Revocación de Tokens:
+Descripción: se implementa de dos forma, la primera es el logout del usuario, donde elimina la sesión desde donde se utiliza, y la segunda sirve para eliminar todas las sesiones de un usuario especifico, actualmente solo los administradores pueden usar esta función
+
+Auditoría y Monitoreo:
+En proceso de desarrollo, por los momentos crea log si hay intentos fallidos de validación de código y de recuperación de contraseña
 
 ## Installation
 
 ```bash
 $ pnpm install
+
+$ Configurar variables de entorno
 ```
 
 ## Running the app
@@ -45,29 +59,16 @@ $ pnpm run start:dev
 $ pnpm run start:prod
 ```
 
-## Test
+## Colaboracion
 
-```bash
-# unit tests
-$ pnpm run test
+Cualquier sugerencia o recomendaciones, puede enviar correo [aqui](zonastartceo@gmail.com).
 
-# e2e tests
-$ pnpm run test:e2e
+## Mantente en contacto
 
-# test coverage
-$ pnpm run test:cov
-```
+- Author - Sergio Ramirez CEO Zona Start
+- Website - [https://zonastart.com](https://zonastart.com)
+- Instagram - [zonastart](https://www.instagram.com/zonastart)
 
-## Support
+## Licentia
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](LICENSE).
+[MIT licensed](LICENSE).

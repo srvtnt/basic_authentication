@@ -14,6 +14,7 @@ interface EnvVars {
   MAX_SESSIONS_USER: number;
   EXPIRES_CODE: number;
   EXPIRE_TOKEN: string;
+  NODE_ENV: string;
 }
 
 const envsSchema = joi
@@ -30,6 +31,7 @@ const envsSchema = joi
     MAX_SESSIONS_USER: joi.number(),
     EXPIRES_CODE: joi.number(),
     EXPIRE_TOKEN: joi.string(),
+    NODE_ENV: joi.string().required(),
   })
   .unknown(true);
 
@@ -53,5 +55,6 @@ export const envs = {
   time_expires_refreshtoken: envVars.EXPIRE_REFRESH_TOKEN,
   max_sesion_user: envVars.MAX_SESSIONS_USER,
   expire_code: envVars.EXPIRES_CODE,
-  expire_token: envVars.EXPIRE_TOKEN
+  expire_token: envVars.EXPIRE_TOKEN,
+  node_env: envVars.NODE_ENV,
 };

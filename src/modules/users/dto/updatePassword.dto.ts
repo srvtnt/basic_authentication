@@ -5,11 +5,6 @@ export class UpdateUserPasswordDto {
   @IsString()
   @IsNotEmpty()
   @Transform(({ value }) => value.trim())
-  old_password?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @Transform(({ value }) => value.trim())
   new_password?: string;
 
   @IsString()

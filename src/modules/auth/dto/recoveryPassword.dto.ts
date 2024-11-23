@@ -14,6 +14,10 @@ export class RecoveryPasswordDto {
   @IsNotEmpty()
   @Transform(({ value }) => value.trim())
   confir_password?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  token_reset_pass?: string;
 }
 
 export class EmailPasswordDto {

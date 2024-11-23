@@ -1,48 +1,29 @@
+import { Transform } from 'class-transformer';
 import {
   IsNotEmpty,
   IsString,
   IsEmail,
   MinLength,
   MaxLength,
-  IsBoolean,
   IsOptional,
-  IsInt,
 } from 'class-validator';
 
-export class RegisterAuthInput {
-  @IsNotEmpty()
+export class RegisterDto {
+  @IsOptional()
+  @Transform(({ value }) => value.trim())
   @IsString()
+  @MinLength(5)
   username: string;
 
-  @IsString()
-  @IsOptional()
-  fullname?: string;
-
-  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) => value.trim())
   @IsEmail()
   email: string;
 
-  @IsString()
-  @IsOptional()
-  phone?: string;
-
-  @IsNotEmpty()
-  @IsString()
   @MinLength(6)
   @MaxLength(16)
+  @IsNotEmpty()
+  @IsString()
+  @Transform(({ value }) => value.trim())
   password: string;
-
-  @IsNotEmpty()
-  @IsString()
-  @MinLength(6)
-  @MaxLength(16)
-  repassword: string;
-
-  @IsString()
-  @IsOptional()
-  image: string;
-
-  @IsNotEmpty()
-  @IsInt()
-  rol_id: number;
 }
