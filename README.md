@@ -44,6 +44,15 @@ En proceso de desarrollo, por los momentos crea log si hay intentos fallidos de 
 $ pnpm install
 
 $ Configurar variables de entorno
+
+# create the model to the database
+$ pnpm prisma db push
+
+# generates the model in prisma
+$ pnpm prisma generate
+
+# seed the database
+$ pnpm prisma db seed
 ```
 
 ## Ejecutando la aplicación
