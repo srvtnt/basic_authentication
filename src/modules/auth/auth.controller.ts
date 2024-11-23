@@ -56,7 +56,7 @@ export class AuthController {
       if (maxAge > 0) {
         res.cookie('auth_session_token', authResponse.refresh_token, {
           httpOnly: true, // Solo accesible desde el servidor
-          secure: envs.node_env === 'producction', // Requiere HTTPS
+          secure: envs.node_env === 'production', // Requiere HTTPS
           sameSite: 'strict', // Evita el uso en contextos de terceros
           maxAge, // Duración en milisegundos
         });
@@ -163,7 +163,7 @@ export class AuthController {
     if (maxAge > 0) {
       res.cookie('auth_session_token', authResponse.refresh_token, {
         httpOnly: true, // Solo accesible desde el servidor
-        secure: envs.node_env === 'producction', // Requiere HTTPS
+        secure: envs.node_env === 'production', // Requiere HTTPS
         sameSite: 'strict', // Evita el uso en contextos de terceros
         maxAge, // Duración en milisegundos
       });

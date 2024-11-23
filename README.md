@@ -38,7 +38,7 @@ Descripción: se implementa de dos forma, la primera es el logout del usuario, d
 Auditoría y Monitoreo:
 En proceso de desarrollo, por los momentos crea log si hay intentos fallidos de validación de código y de recuperación de contraseña
 
-## Installation
+## Instalación
 
 ```bash
 $ pnpm install
@@ -46,7 +46,7 @@ $ pnpm install
 $ Configurar variables de entorno
 ```
 
-## Running the app
+## Ejecutando la aplicación
 
 ```bash
 # development
@@ -69,6 +69,6 @@ Cualquier sugerencia o recomendaciones, puede enviar correo [aqui](zonastartceo@
 - Website - [https://zonastart.com](https://zonastart.com)
 - Instagram - [zonastart](https://www.instagram.com/zonastart)
 
-## Licentia
+## Licencia
 
 [MIT licensed](LICENSE).
